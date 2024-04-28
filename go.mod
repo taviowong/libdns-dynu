@@ -1,6 +1,6 @@
 module github.com/taviowong/libdns-dynu
 
-go 1.22
+go 1.19
 
 require github.com/libdns/libdns v0.2.2
 
