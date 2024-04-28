@@ -1,26 +1,22 @@
-**DEVELOPER INSTRUCTIONS:**
-
-This repo is a template for developers to use when creating new [libdns](https://github.com/libdns/libdns) provider implementations.
-
-Be sure to update:
-
-- The package name
-- The Go module name in go.mod
-- The latest `libdns/libdns` version in go.mod
-- All comments and documentation, including README below and godocs
-- License (must be compatible with Apache/MIT)
-- All "TODO:"s is in the code
-- All methods that currently do nothing
-
-Remove this section from the readme before publishing.
-
----
-
-\<PROVIDER NAME\> for [`libdns`](https://github.com/libdns/libdns)
+Dynu for [`libdns`](https://github.com/libdns/libdns)
 =======================
 
-[![Go Reference](https://pkg.go.dev/badge/test.svg)](https://pkg.go.dev/github.com/libdns/TODO:PROVIDER_NAME)
+[![Go Reference](https://pkg.go.dev/badge/test.svg)](https://pkg.go.dev/github.com/libdns/dynu)
 
-This package implements the [libdns interfaces](https://github.com/libdns/libdns) for \<PROVIDER\>, allowing you to manage DNS records.
+This package implements the [libdns interfaces](https://github.com/libdns/libdns) for Dynu, allowing you to manage DNS records.
 
-TODO: Show how to configure and use. Explain any caveats.
+## Authenticating
+
+This package uses **API Token authentication**. Refer to the [Dynu documentation](https://www.dynu.com/Support/API) for more information.
+
+Start by retrieving your API token (API-Key) from the [table on the API Credentials page](https://www.dynu.com/ControlPanel/APICredentials) to be able to make authenticated requests to the API.
+
+## Tests
+
+Several tests for the basic functionality of the real Dynu API are available. These tests are not run by default. Set the environment variables TEST_ZONE and TEST_API_TOKEN to enable the tests like so:
+
+```
+TEST_ZONE=example.com. TEST_API_TOKEN=dynu_api_token go test -v
+```
+
+If the tests fail, you can manually check and fix the DNS records on the [DDNS Services page](https://www.dynu.com/en-US/ControlPanel/DDNS).
