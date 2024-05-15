@@ -16,7 +16,8 @@ import (
 // Provider facilitates DNS record manipulation with dynu.
 type Provider struct {
 	// config fields (with snake_case json struct tags on exported fields)
-	APIToken string `json:"api_token,omitempty"`
+	APIToken  string `json:"api_token,omitempty"`
+	OwnDomain string `json:"own_domain,omitempty"`
 
 	Once   sync.Once
 	Client *Client
@@ -32,10 +33,10 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 
 	var libRecords []libdns.Record
 
-	fqdn := zoneToFqdn(zone)
+	domain := zoneToFqdn(zone)
 
 	// GET /dns/getroot/{hostname}
-	dnsHostName, err := p.Client.GetRootDomain(ctx, fqdn)
+	dnsHostName, err := p.Client.GetRootDomain(ctx, p.OwnDomain)
 	if err != nil {
 		return nil, err
 	}
@@ -47,18 +48,19 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 	}
 
 	for _, dnsRecord := range dnsRecords {
-		libRecords = append(libRecords, dnsRecordToLibdnsRecord(dnsRecord))
+		libRecords = append(libRecords, dnsRecordToLibdnsRecord(dnsRecord, domain))
 	}
 
 	return libRecords, nil
 }
 
-func dnsRecordToLibdnsRecord(dnsRecord DNSRecord) libdns.Record {
-	var relativeName string
-	if dnsRecord.NodeName == "" {
+func dnsRecordToLibdnsRecord(dnsRecord DNSRecord, domain string) libdns.Record {
+	var fqdn = dnsRecord.Hostname
+
+	// sub.owndomain.domain.com -> sub.owndomain
+	var relativeName string = libdns.RelativeName(fqdn, domain)
+	if relativeName == "" {
 		relativeName = "@"
-	} else {
-		relativeName = dnsRecord.NodeName
 	}
 
 	libRecord := libdns.Record{
@@ -112,16 +114,16 @@ func (p *Provider) appendOrSetRecords(ctx context.Context, zone string, records 
 	var updatedRecords []libdns.Record
 	var updateErrors []error
 
-	fqdn := zoneToFqdn(zone)
+	domain := zoneToFqdn(zone)
 
 	// GET /dns/getroot/{hostname}
-	dnsHostName, err := p.Client.GetRootDomain(ctx, fqdn)
+	dnsHostName, err := p.Client.GetRootDomain(ctx, p.OwnDomain)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, rec := range records {
-		dnsRecord, err := libdnsRecordToDnsRecord(fqdn, rec)
+		dnsRecord, err := libdnsRecordToDnsRecord(rec, domain, p.OwnDomain)
 		if err != nil {
 			updateErrors = append(updateErrors, err)
 			continue
@@ -133,21 +135,30 @@ func (p *Provider) appendOrSetRecords(ctx context.Context, zone string, records 
 		if err != nil {
 			updateErrors = append(updateErrors, fmt.Errorf("dnsRecord %+v: %w", rec, err))
 		} else {
-			updatedRecords = append(updatedRecords, dnsRecordToLibdnsRecord(*updateResponse))
+			updatedRecords = append(updatedRecords, dnsRecordToLibdnsRecord(*updateResponse, domain))
 		}
 	}
 
 	return updatedRecords, errors.Join(updateErrors...)
 }
 
-func libdnsRecordToDnsRecord(fqdn string, record libdns.Record) (DNSRecord, error) {
+func libdnsRecordToDnsRecord(record libdns.Record, domain string, ownDomain string) (DNSRecord, error) {
 	var id int64
 	fmt.Sscan(record.ID, &id)
+
+	var nodeName = record.Name
+	if nodeName == "@" {
+		nodeName = ""
+	}
+
+	// sub.owndomain -> sub.owndomain.domain.com -> sub
+	var fqdn = libdns.AbsoluteName(nodeName, domain)
+	var relativeName = libdns.RelativeName(fqdn, ownDomain)
 
 	dnsRecord := DNSRecord{
 		ID:       id,
 		Type:     record.Type,
-		NodeName: record.Name,
+		NodeName: relativeName,
 		TTL:      int(record.TTL.Seconds()),
 		State:    true, // must be set to true to take effect
 	}
@@ -168,17 +179,13 @@ func libdnsRecordToDnsRecord(fqdn string, record libdns.Record) (DNSRecord, erro
 		dnsRecord.Host = record.Value
 	case "PTR":
 		dnsRecord.Host = record.Name
-		dnsRecord.NodeName = libdns.RelativeName(record.Value, fqdn) // seems Dynu can only point to subdomain; get relative name from input
+		dnsRecord.NodeName = libdns.RelativeName(record.Value, ownDomain) // seems Dynu can only point to subdomain; get relative name from input
 	case "SPF":
 		dnsRecord.TextData = record.Value
 	case "TXT":
 		dnsRecord.TextData = record.Value
 	default:
 		err = fmt.Errorf("dnsRecord %+v: record type not implemented", record)
-	}
-
-	if dnsRecord.NodeName == "@" {
-		dnsRecord.NodeName = ""
 	}
 
 	return dnsRecord, err
@@ -191,10 +198,8 @@ func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []lib
 	var deletedRecords []libdns.Record
 	var deleteErrors []error
 
-	fqdn := zoneToFqdn(zone)
-
 	// GET /dns/getroot/{hostname}
-	dnsHostName, err := p.Client.GetRootDomain(ctx, fqdn)
+	dnsHostName, err := p.Client.GetRootDomain(ctx, p.OwnDomain)
 	if err != nil {
 		return nil, err
 	}
