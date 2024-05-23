@@ -23,13 +23,13 @@ type Provider struct {
 	Client *Client
 }
 
-func (p *Provider) Init() {
+func (p *Provider) init() {
 	p.Client = NewClient(p.APIToken)
 }
 
 // GetRecords lists all the records in the zone.
 func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
-	p.Once.Do(func() { p.Init() })
+	p.Once.Do(func() { p.init() })
 
 	var libRecords []libdns.Record
 
@@ -109,7 +109,7 @@ func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns
 
 // if ignoreRecordId is true, the records will be added even if record id is provided
 func (p *Provider) appendOrSetRecords(ctx context.Context, zone string, records []libdns.Record, ignoreRecordId bool) ([]libdns.Record, error) {
-	p.Once.Do(func() { p.Init() })
+	p.Once.Do(func() { p.init() })
 
 	var updatedRecords []libdns.Record
 	var updateErrors []error
@@ -193,7 +193,7 @@ func libdnsRecordToDnsRecord(record libdns.Record, domain string, ownDomain stri
 
 // DeleteRecords deletes the records from the zone. It returns the records that were deleted.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	p.Once.Do(func() { p.Init() })
+	p.Once.Do(func() { p.init() })
 
 	var deletedRecords []libdns.Record
 	var deleteErrors []error
