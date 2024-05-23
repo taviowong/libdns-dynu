@@ -1,3 +1,5 @@
+Use [libdns/dynu](https://github.com/libdns/dynu) instead.
+
 Dynu for [`libdns`](https://github.com/libdns/libdns)
 =======================
 
